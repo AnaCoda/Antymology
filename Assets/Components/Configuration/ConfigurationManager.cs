@@ -49,4 +49,9 @@ public class ConfigurationManager : Singleton<ConfigurationManager>
     /// The radius of each acidic region
     /// </summary>
     public int Conatiner_Sphere_Radius = 20;
+
+    /// <summary>
+    /// The number of ants to spawn at the start of the game.
+    /// </summary>
+    public int Initial_Ant_Count = 20;
 }

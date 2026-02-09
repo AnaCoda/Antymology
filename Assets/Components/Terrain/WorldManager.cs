@@ -1,4 +1,5 @@
 ﻿using Antymology.Helpers;
+using Antymology.Agents;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -84,11 +85,49 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
-        /// TO BE IMPLEMENTED BY YOU
+        /// Spawns initial ants in the world at valid positions.
         /// </summary>
         private void GenerateAnts()
         {
-            throw new NotImplementedException();
+            GameObject antsContainer = new GameObject("Ants");
+            int antsToSpawn = ConfigurationManager.Instance.Initial_Ant_Count;
+
+            for (int i = 0; i < antsToSpawn; i++)
+            {
+                Vector3Int spawnPos = FindValidSpawnPosition();
+                
+                GameObject antObj = Instantiate(antPrefab, antsContainer.transform);
+                antObj.transform.position = new Vector3(spawnPos.x, spawnPos.y, spawnPos.z);
+                
+                Ant ant = antObj.GetComponent<Ant>();
+                if (ant != null)
+                {
+                    ant.worldPosition = spawnPos;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Finds a valid position to spawn an ant (on top of a non-air block).
+        /// </summary>
+        private Vector3Int FindValidSpawnPosition()
+        {
+            int x = RNG.Next(1, Blocks.GetLength(0) - 1);
+            int z = RNG.Next(1, Blocks.GetLength(2) - 1);
+            int y = Blocks.GetLength(1) - 1;
+
+            while (GetBlock(x, y, z) is AirBlock)
+            {
+                y--;
+                if (y < 0)
+                {
+                    x = RNG.Next(1, Blocks.GetLength(0) - 1);
+                    z = RNG.Next(1, Blocks.GetLength(2) - 1);
+                    y = Blocks.GetLength(1) - 1;
+                }
+            }
+
+            return new Vector3Int(x, y + 1, z);
         }
 
         #endregion
