@@ -25,14 +25,18 @@ namespace Antymology.UI
 
         void Update()
         {
-            lastMouse = Input.mousePosition - lastMouse;
-            lastMouse = new Vector3(-lastMouse.y * camSens, lastMouse.x * camSens, 0);
-            lastMouse = new Vector3(transform.eulerAngles.x + lastMouse.x, transform.eulerAngles.y + lastMouse.y, 0);
-
-            if (Input.GetMouseButton(2))
-                transform.eulerAngles = lastMouse;
-            lastMouse = Input.mousePosition;
-            //Mouse  camera angle done.  
+            Vector3 rotation = transform.eulerAngles;
+            
+            if (Input.GetKey(KeyCode.UpArrow))
+                rotation.x -= camSens * 100 * Time.deltaTime;
+            if (Input.GetKey(KeyCode.DownArrow))
+                rotation.x += camSens * 100 * Time.deltaTime;
+            if (Input.GetKey(KeyCode.LeftArrow))
+                rotation.y -= camSens * 100 * Time.deltaTime;
+            if (Input.GetKey(KeyCode.RightArrow))
+                rotation.y += camSens * 100 * Time.deltaTime;
+            
+            transform.eulerAngles = rotation;  
 
             //Keyboard commands
             Vector3 p = GetBaseInput();

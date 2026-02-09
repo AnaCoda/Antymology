@@ -97,7 +97,7 @@ namespace Antymology.Terrain
                 Vector3Int spawnPos = FindValidSpawnPosition();
                 
                 GameObject antObj = Instantiate(antPrefab, antsContainer.transform);
-                antObj.transform.position = new Vector3(spawnPos.x, spawnPos.y, spawnPos.z);
+                antObj.transform.position = new Vector3(spawnPos.x, spawnPos.y - 0.5f, spawnPos.z);
                 
                 Ant ant = antObj.GetComponent<Ant>();
                 if (ant != null)

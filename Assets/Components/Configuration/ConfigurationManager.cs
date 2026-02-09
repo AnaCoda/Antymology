@@ -53,5 +53,5 @@ public class ConfigurationManager : Singleton<ConfigurationManager>
     /// <summary>
     /// The number of ants to spawn at the start of the game.
     /// </summary>
-    public int Initial_Ant_Count = 20;
+    public int Initial_Ant_Count = 500;
 }
