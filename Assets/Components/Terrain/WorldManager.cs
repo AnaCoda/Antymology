@@ -18,6 +18,11 @@ namespace Antymology.Terrain
         public GameObject antPrefab;
 
         /// <summary>
+        /// The prefab containing the queen ant.
+        /// </summary>
+        public GameObject queenAntPrefab;
+
+        /// <summary>
         /// The material used for eech block.
         /// </summary>
         public Material blockMaterial;

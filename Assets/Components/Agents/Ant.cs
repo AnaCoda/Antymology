@@ -100,7 +100,7 @@ namespace Antymology.Agents
         private bool MaybeTakeDamageFromAcid()
         {
             AbstractBlock blockBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
-            if (blockBelow is AcidBlock)
+            if (blockBelow is AcidicBlock)
             {
                 TakeDamage(ConfigurationManager.Instance.Health_Reduction_Per_Timestep);
                 return true;
