@@ -97,10 +97,15 @@ namespace Antymology.Terrain
             GenerateData();
             GenerateChunks();
 
-            Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
-            Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
-
             GenerateAnts();
+            
+            // Position camera to look at queen
+            if (AntManager.Instance.Queen != null)
+            {
+                Vector3 queenPos = AntManager.Instance.Queen.transform.position;
+                Camera.main.transform.position = queenPos + new Vector3(0, 30, -30);
+                Camera.main.transform.LookAt(queenPos);
+            }
         }
 
         private void Update()
@@ -129,7 +134,8 @@ namespace Antymology.Terrain
 
         public void RegenerateAnts(List<AntGenome> genomes)
         {
-            ResetNestBlocks();
+            // Regenerate entire world with new random seed to prevent overfitting
+            RegenerateWorld();
             
             GameObject antsContainer = GameObject.Find("Ants");
             if (antsContainer == null)
@@ -154,6 +160,11 @@ namespace Antymology.Terrain
                 }
                 queenAnt.MoveTo(queenSpawnPos);
                 AntManager.Instance.Queen = queenAnt;
+                
+                // Position camera to look at queen
+                Vector3 queenPos = queenAnt.transform.position;
+                Camera.main.transform.position = queenPos + new Vector3(0, 30, -30);
+                Camera.main.transform.LookAt(queenPos);
             }
 
             // Spawn worker ants
@@ -194,7 +205,36 @@ namespace Antymology.Terrain
 
             return new Vector3Int(x, y + 1, z);
         }
-        
+
+        /// <summary>
+        /// Regenerates the entire world with a new random seed.
+        /// </summary>
+        public void RegenerateWorld()
+        {
+            int newSeed = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
+            
+            RNG = new System.Random(newSeed);
+            SimplexNoise = new SimplexNoise(newSeed);
+            
+            nestBlockCount = 0;
+            
+            GenerateData();
+            
+            for (int x = 0; x < Chunks.GetLength(0); x++)
+            {
+                for (int y = 0; y < Chunks.GetLength(1); y++)
+                {
+                    for (int z = 0; z < Chunks.GetLength(2); z++)
+                    {
+                        if (Chunks[x, y, z] != null)
+                        {
+                            Chunks[x, y, z].GenerateMesh();
+                        }
+                    }
+                }
+            }
+        }
+
         public void ResetNestBlocks()
         {
             for (int x = 0; x < Blocks.GetLength(0); x++)

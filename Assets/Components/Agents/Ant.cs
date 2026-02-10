@@ -14,6 +14,7 @@ namespace Antymology.Agents
         public int mulchConsumed = 0;
         public float healthDonatedToQueen = 0f;
         public float survivalTime = 0f;
+        public int stepsSinceHealthTransfer = 999; // Cooldown to prevent ping-pong
         
         protected System.Random random = new System.Random();
         public Vector3Int previousPosition;
@@ -65,6 +66,7 @@ namespace Antymology.Agents
         public virtual void PerformTimestep()
         {
             survivalTime += 1f;
+            stepsSinceHealthTransfer++;
             
             if (!TryConsumeMulch())
             {
@@ -286,7 +288,10 @@ namespace Antymology.Agents
 
         protected void TryShareHealth()
         {
-            if (health < maxHealth * 0.4f)
+            if (!(this is QueenAnt) && (stepsSinceHealthTransfer < 5 || health < maxHealth * 0.6f))
+                return;
+            
+            if (this is QueenAnt && health < maxHealth * 0.3f)
                 return;
 
             foreach (Ant otherAnt in AntManager.Instance.Ants)
@@ -297,31 +302,35 @@ namespace Antymology.Agents
                 bool shouldShare = false;
                 float shareAmount = 0f;
 
-                // Prioritize feeding queens generously
-                if (otherAnt is QueenAnt && otherAnt.health < otherAnt.maxHealth * 0.9f)
+                // Workers ONLY feed queens (no worker-to-worker transfers)
+                if (!(this is QueenAnt) && otherAnt is QueenAnt && otherAnt.health < otherAnt.maxHealth * 0.95f)
                 {
                     shouldShare = true;
-                    // Give everything we can spare
-                    shareAmount = Mathf.Min(health - maxHealth * 0.3f, otherAnt.maxHealth - otherAnt.health);
-                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight * 2.0f);
+                    shareAmount = Mathf.Min(health - maxHealth * 0.4f, otherAnt.maxHealth - otherAnt.health);
+                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight * 3.0f);
+                    
+                    if (shareAmount < 5f)
+                        shouldShare = false;
                 }
-                // Also help other workers in dire need
-                else if (!(this is QueenAnt) && otherAnt.health < otherAnt.maxHealth * 0.2f && health > maxHealth * 0.7f)
+                else if (this is QueenAnt && !(otherAnt is QueenAnt) && otherAnt.health < otherAnt.maxHealth * 0.15f)
                 {
                     shouldShare = true;
-                    shareAmount = Mathf.Min(health - maxHealth * 0.5f, otherAnt.maxHealth * 0.2f);
-                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight * 0.3f);
+                    shareAmount = Mathf.Min(health - maxHealth * 0.3f, 10f); // Small emergency donation
+                    shareAmount = Mathf.Max(0, shareAmount);
                 }
 
                 if (shouldShare && shareAmount > 0)
                 {
                     TakeDamage(shareAmount);
                     otherAnt.Heal(shareAmount);
+                    stepsSinceHealthTransfer = 0;
+                    otherAnt.stepsSinceHealthTransfer = 0;
                     
                     // Track health donated to queen for fitness
                     if (otherAnt is QueenAnt)
                     {
                         healthDonatedToQueen += shareAmount;
+                        Debug.Log($"[Worker] Donated {shareAmount:F1} health to Queen. Total donated: {healthDonatedToQueen:F1}");
                     }
                     
                     return;
@@ -459,10 +468,9 @@ namespace Antymology.Agents
 
             score -= genome.crowdingWeight * nearbyAnts;
 
-            // Workers strongly seek queens when they have health to donate
-            if (!(ant is QueenAnt) && distanceToQueenSq < int.MaxValue && healthPercent > 0.5f)
+            if (!(ant is QueenAnt) && distanceToQueenSq < int.MaxValue && healthPercent > 0.6f)
             {
-                score += genome.queenProximityWeight * 15.0f / Mathf.Max(1, distanceToQueenSq);
+                score += genome.queenProximityWeight * 50.0f / Mathf.Max(1, distanceToQueenSq);
             }
 
             return score;
