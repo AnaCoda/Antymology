@@ -98,6 +98,13 @@ namespace Antymology.Agents
 
         public void MoveTo(Vector3Int target)
         {
+            Vector3 direction = new Vector3(target.x - worldPosition.x, 0, target.z - worldPosition.z);
+            
+            if (direction != Vector3.zero)
+            {
+                transform.rotation = Quaternion.LookRotation(direction);
+            }
+            
             worldPosition = target;
             transform.position = new Vector3(target.x, target.y - 0.5f, target.z);
         }
