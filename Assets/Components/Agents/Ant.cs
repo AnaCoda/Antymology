@@ -45,7 +45,11 @@ namespace Antymology.Agents
 
         public void PerformTimestep()
         {
-            MoveRandomly();
+            if (!TryConsumeMulch())
+            {
+                MoveRandomly();
+            }
+            TakeDamage(ConfigurationManager.Instance.Health_Reduction_Per_Timestep);
         }
 
         private void MoveRandomly()
@@ -77,6 +81,19 @@ namespace Antymology.Agents
 
             result = new Vector3Int(targetX, groundY + 1, targetZ);
             return true;
+        }
+
+        private bool TryConsumeMulch()
+        {
+            AbstractBlock blockBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
+            if (blockBelow is MulchBlock)
+            {
+                WorldManager.Instance.SetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z, new AirBlock());
+                MoveTo(new Vector3Int(worldPosition.x, worldPosition.y - 1, worldPosition.z));
+                Heal(ConfigurationManager.Instance.Mulch_Healing_Amount);
+                return true;
+            }
+            return false;
         }
 
         private int FindGroundLevel(int x, int z)

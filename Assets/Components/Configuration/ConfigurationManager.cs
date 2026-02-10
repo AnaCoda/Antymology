@@ -59,4 +59,14 @@ public class ConfigurationManager : Singleton<ConfigurationManager>
     /// Time in seconds between each timestep.
     /// </summary>
     public float Timestep_Interval = 0.5f;
+
+    /// <summary>
+    /// Per turn ant health reduction.
+    /// </summary>
+    public float Health_Reduction_Per_Timestep = 1f;
+
+    /// <summary>
+    /// Mulch block healing amount.
+    /// </summary>
+    public float Mulch_Healing_Amount = 3f;
 }
