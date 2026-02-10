@@ -7,6 +7,7 @@ namespace Antymology.Agents
     {
         public int nestsBuilt = 0;
         private float nestBuildCost;
+        private int stepsSinceLastBuild = 999; // Start high so she can build immediately
 
         private void Awake()
         {
@@ -15,17 +16,21 @@ namespace Antymology.Agents
 
         public override void PerformTimestep()
         {
-            if (!TryConsumeMulch())
+            survivalTime += 1f;
+            stepsSinceLastBuild++;
+            
+            TryShareHealth();
+            
+            // Must wait at least 3 steps between nest builds
+            if (ShouldBuildNest() && stepsSinceLastBuild >= 3)
             {
-                if (ShouldBuildNest())
-                {
-                    BuildNest();
-                }
-                else
-                {
-                    PerformQueenMicroMovement();
-                }
+                BuildNest();
             }
+            else
+            {
+                PerformQueenMicroMovement();
+            }
+            
             TakeDamage(ConfigurationManager.Instance.Health_Reduction_Per_Timestep);
             MaybeTakeDamageFromAcid();
         }
@@ -33,28 +38,6 @@ namespace Antymology.Agents
         private void PerformQueenMicroMovement()
         {
             MicroInfo[] microOptions = ComputeMicroOptions();
-            
-            Debug.Log($"[Queen] At {worldPosition}, Health: {health:F1}/{maxHealth:F1}, ConsecutiveStays: {consecutiveStays}");
-            
-            for (int i = 0; i < microOptions.Length; i++)
-            {
-                MicroInfo opt = microOptions[i];
-                string dirName = opt.direction == Vector3Int.zero ? "STAY" : 
-                                opt.direction.x > 0 ? "EAST" :
-                                opt.direction.x < 0 ? "WEST" :
-                                opt.direction.z > 0 ? "NORTH" : "SOUTH";
-                
-                if (opt.canMove)
-                {
-                    float score = opt.ComputeScore(this);
-                    Debug.Log($"  [{dirName}] pos={opt.position}, score={score:F3}, food={opt.distanceToFoodSq}, uneatable={opt.hasUneatableFood}, ants={opt.nearbyAnts}, prevPos={opt.position == previousPosition}");
-                }
-                else
-                {
-                    Debug.Log($"  [{dirName}] BLOCKED");
-                }
-            }
-            
             MicroInfo best = microOptions[0];
             
             for (int i = 1; i < microOptions.Length; i++)
@@ -65,11 +48,11 @@ namespace Antymology.Agents
                 }
             }
             
-            string chosenDir = best.direction == Vector3Int.zero ? "STAY" : 
-                              best.direction.x > 0 ? "EAST" :
-                              best.direction.x < 0 ? "WEST" :
-                              best.direction.z > 0 ? "NORTH" : "SOUTH";
-            Debug.Log($"  >> CHOSEN: {chosenDir}, moving to {best.position}, consecutiveStays={consecutiveStays}");
+            AbstractBlock blockBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
+            if (blockBelow is NestBlock && best.position == worldPosition)
+            {
+                Debug.Log($"[Queen] WARNING: Choosing to stay on nest! Health: {health:F1}, stepsSinceLastBuild: {stepsSinceLastBuild}");
+            }
             
             if (best.canMove && best.position != worldPosition)
             {
@@ -82,9 +65,22 @@ namespace Antymology.Agents
             }
         }
 
+        protected override void Die()
+        {
+            Debug.Log($"[Queen] Died at generation {EvolutionManager.Instance.currentGeneration}. Nests built: {nestsBuilt}");
+            
+            if (EvolutionManager.Instance != null)
+            {
+                EvolutionManager.Instance.EndGenerationNow();
+            }
+            
+            base.Die();
+        }
+
         private bool ShouldBuildNest()
         {
-            return health >= maxHealth * 0.8f;
+            // Build whenever we have enough health (nest costs 33% max health)
+            return health >= nestBuildCost + 5f;
         }
 
         private void BuildNest()
@@ -96,6 +92,9 @@ namespace Antymology.Agents
                 WorldManager.Instance.SetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z, new NestBlock());
                 TakeDamage(nestBuildCost);
                 nestsBuilt++;
+                stepsSinceLastBuild = 0;
+                
+                Debug.Log($"[Queen] Built nest #{nestsBuilt} at {worldPosition}, health now {health:F1}");
                 
                 if (EvolutionManager.Instance != null)
                 {

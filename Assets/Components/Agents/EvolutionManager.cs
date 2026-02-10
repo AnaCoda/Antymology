@@ -13,7 +13,7 @@ namespace Antymology.Agents
         public int bestNestCount = 0;
         
         private float generationTimer = 0f;
-        private List<AntGenome> genePool = new List<AntGenome>();
+        private Dictionary<AntGenome, float> genomeFitness = new Dictionary<AntGenome, float>();
 
         private void Update()
         {
@@ -23,6 +23,11 @@ namespace Antymology.Agents
             {
                 EndGeneration();
             }
+        }
+
+        public void EndGenerationNow()
+        {
+            EndGeneration();
         }
 
         public void RegisterNestBuilt()
@@ -36,14 +41,33 @@ namespace Antymology.Agents
 
         public void RegisterAntGenome(AntGenome genome)
         {
-            if (!genePool.Contains(genome))
+            if (!genomeFitness.ContainsKey(genome))
             {
-                genePool.Add(genome);
+                genomeFitness[genome] = 0f;
+            }
+        }
+
+        public void RecordAntFitness(Ant ant)
+        {
+            if (ant.genome == null) return;
+            
+            // Fitness = health donated to queen * 5 + survival time * 0.1 + mulch consumed * 0.2
+            float fitness = (ant.healthDonatedToQueen * 5f) + (ant.survivalTime * 0.1f) + (ant.mulchConsumed * 0.2f);
+            
+            if (genomeFitness.ContainsKey(ant.genome))
+            {
+                genomeFitness[ant.genome] = Mathf.Max(genomeFitness[ant.genome], fitness);
             }
         }
 
         private void EndGeneration()
         {
+            // Record fitness for all living ants
+            foreach (Ant ant in AntManager.Instance.Ants)
+            {
+                RecordAntFitness(ant);
+            }
+            
             Debug.Log($"Generation {currentGeneration} ended. Nests built: {nestsThisGeneration}");
             
             currentGeneration++;
@@ -55,7 +79,7 @@ namespace Antymology.Agents
 
         private void EvolveNextGeneration()
         {
-            if (genePool.Count < 2)
+            if (genomeFitness.Count < 2)
             {
                 RestartWithRandomGenomes();
                 return;
@@ -63,34 +87,46 @@ namespace Antymology.Agents
 
             List<AntGenome> survivors = SelectTopPerformers();
             
-            List<AntGenome> newGeneration = new List<AntGenome>();
+            Dictionary<AntGenome, float> newGenomeFitness = new Dictionary<AntGenome, float>();
             
             for (int i = 0; i < ConfigurationManager.Instance.Initial_Ant_Count - 1; i++)
             {
                 AntGenome parent1 = survivors[Random.Range(0, survivors.Count)];
                 AntGenome parent2 = survivors[Random.Range(0, survivors.Count)];
-                newGeneration.Add(new AntGenome(parent1, parent2));
+                AntGenome child = new AntGenome(parent1, parent2);
+                newGenomeFitness[child] = 0f;
             }
             
-            genePool = newGeneration;
+            genomeFitness = newGenomeFitness;
             
             RestartSimulation();
         }
 
         private List<AntGenome> SelectTopPerformers()
         {
-            int survivorCount = Mathf.Max(2, genePool.Count / 5);
-            return genePool.Take(survivorCount).ToList();
+            // Sort genomes by fitness
+            var sortedGenomes = genomeFitness.OrderByDescending(kvp => kvp.Value).ToList();
+            
+            int survivorCount = Mathf.Max(2, sortedGenomes.Count / 5);
+            
+            List<AntGenome> survivors = new List<AntGenome>();
+            for (int i = 0; i < survivorCount && i < sortedGenomes.Count; i++)
+            {
+                survivors.Add(sortedGenomes[i].Key);
+                Debug.Log($"  Survivor {i}: Fitness = {sortedGenomes[i].Value:F1}");
+            }
+            
+            return survivors;
         }
 
         private void RestartWithRandomGenomes()
         {
-            genePool.Clear();
+            genomeFitness.Clear();
             for (int i = 0; i < ConfigurationManager.Instance.Initial_Ant_Count; i++)
             {
                 AntGenome genome = new AntGenome();
                 genome.Randomize();
-                genePool.Add(genome);
+                genomeFitness[genome] = 0f;
             }
             RestartSimulation();
         }
@@ -99,23 +135,24 @@ namespace Antymology.Agents
         {
             foreach (Ant ant in AntManager.Instance.Ants.ToList())
             {
+                RecordAntFitness(ant);
                 Destroy(ant.gameObject);
             }
             
-            WorldManager.Instance.RegenerateAnts(genePool);
+            WorldManager.Instance.RegenerateAnts(new List<AntGenome>(genomeFitness.Keys));
         }
 
         public AntGenome GetNextGenome()
         {
-            if (genePool.Count == 0)
+            if (genomeFitness.Count == 0)
             {
                 AntGenome genome = new AntGenome();
                 genome.Randomize();
+                genomeFitness[genome] = 0f;
                 return genome;
             }
             
-            AntGenome result = genePool[0];
-            genePool.RemoveAt(0);
+            AntGenome result = genomeFitness.Keys.First();
             return result;
         }
     }

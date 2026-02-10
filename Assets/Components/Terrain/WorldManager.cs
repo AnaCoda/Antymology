@@ -107,7 +107,8 @@ namespace Antymology.Terrain
         {
             if (nestCountText != null)
             {
-                nestCountText.text = $"Nest Blocks: {nestBlockCount}";
+                int generation = EvolutionManager.Instance != null ? EvolutionManager.Instance.currentGeneration : 0;
+                nestCountText.text = $"Nest Blocks: {nestBlockCount}\nGeneration: {generation}";
             }
         }
 
@@ -128,6 +129,8 @@ namespace Antymology.Terrain
 
         public void RegenerateAnts(List<AntGenome> genomes)
         {
+            ResetNestBlocks();
+            
             GameObject antsContainer = GameObject.Find("Ants");
             if (antsContainer == null)
             {
@@ -191,7 +194,23 @@ namespace Antymology.Terrain
 
             return new Vector3Int(x, y + 1, z);
         }
-
+        
+        public void ResetNestBlocks()
+        {
+            for (int x = 0; x < Blocks.GetLength(0); x++)
+            {
+                for (int y = 0; y < Blocks.GetLength(1); y++)
+                {
+                    for (int z = 0; z < Blocks.GetLength(2); z++)
+                    {
+                        if (Blocks[x, y, z] is NestBlock)
+                        {
+                            SetBlock(x, y, z, new StoneBlock());
+                        }
+                    }
+                }
+            }
+        }
         #endregion
 
         #region Methods

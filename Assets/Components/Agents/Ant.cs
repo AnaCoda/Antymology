@@ -12,6 +12,8 @@ namespace Antymology.Agents
         public Vector3Int worldPosition;
         public AntGenome genome;
         public int mulchConsumed = 0;
+        public float healthDonatedToQueen = 0f;
+        public float survivalTime = 0f;
         
         protected System.Random random = new System.Random();
         public Vector3Int previousPosition;
@@ -55,13 +57,15 @@ namespace Antymology.Agents
             health = Mathf.Min(health + amount, maxHealth);
         }
 
-        private void Die()
+        protected virtual void Die()
         {
             Destroy(gameObject);
         }
 
         public virtual void PerformTimestep()
         {
+            survivalTime += 1f;
+            
             if (!TryConsumeMulch())
             {
                 TryShareHealth();
@@ -190,8 +194,13 @@ namespace Antymology.Agents
                 if (distSq <= visionRange * visionRange)
                 {
                     info.nearbyAnts++;
-                    
-                    if (ant is QueenAnt && distSq < info.distanceToQueenSq)
+                }
+                
+                // Queens are detectable from much farther away (50 blocks)
+                if (ant is QueenAnt && distSq < info.distanceToQueenSq)
+                {
+                    int queenDetectionRange = 50;
+                    if (distSq <= queenDetectionRange * queenDetectionRange)
                     {
                         info.distanceToQueenSq = distSq;
                     }
@@ -277,7 +286,7 @@ namespace Antymology.Agents
 
         protected void TryShareHealth()
         {
-            if (health < maxHealth * 0.5f)
+            if (health < maxHealth * 0.4f)
                 return;
 
             foreach (Ant otherAnt in AntManager.Instance.Ants)
@@ -288,23 +297,33 @@ namespace Antymology.Agents
                 bool shouldShare = false;
                 float shareAmount = 0f;
 
-                if (otherAnt is QueenAnt && otherAnt.health < otherAnt.maxHealth * 0.6f)
+                // Prioritize feeding queens generously
+                if (otherAnt is QueenAnt && otherAnt.health < otherAnt.maxHealth * 0.9f)
                 {
                     shouldShare = true;
+                    // Give everything we can spare
                     shareAmount = Mathf.Min(health - maxHealth * 0.3f, otherAnt.maxHealth - otherAnt.health);
-                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight);
+                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight * 2.0f);
                 }
-                else if (otherAnt.health < otherAnt.maxHealth * 0.3f && health > maxHealth * 0.7f)
+                // Also help other workers in dire need
+                else if (!(this is QueenAnt) && otherAnt.health < otherAnt.maxHealth * 0.2f && health > maxHealth * 0.7f)
                 {
                     shouldShare = true;
                     shareAmount = Mathf.Min(health - maxHealth * 0.5f, otherAnt.maxHealth * 0.2f);
-                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight * 0.5f);
+                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight * 0.3f);
                 }
 
                 if (shouldShare && shareAmount > 0)
                 {
                     TakeDamage(shareAmount);
                     otherAnt.Heal(shareAmount);
+                    
+                    // Track health donated to queen for fitness
+                    if (otherAnt is QueenAnt)
+                    {
+                        healthDonatedToQueen += shareAmount;
+                    }
+                    
                     return;
                 }
             }
@@ -396,12 +415,28 @@ namespace Antymology.Agents
             AntGenome genome = ant.genome;
             float score = 0;
             
-            // Small exploration bonus for moving (not staying)
-            if (direction != Vector3Int.zero)
-                score += 0.05f;
+            // Check if standing on a nest block
+            AbstractBlock blockBelow = WorldManager.Instance.GetBlock(position.x, position.y - 1, position.z);
+            bool onNest = blockBelow is NestBlock;
+            
+            // Queens prefer to stay put but not too much, workers prefer to move
+            if (ant is QueenAnt)
+            {
+                if (direction == Vector3Int.zero)
+                {
+                    if (onNest)
+                        score -= 5.0f; // Strong penalty for staying on nest
+                    else
+                        score += 0.2f; // Queens like staying but can still move
+                }
+            }
             else
-                // Penalty for consecutive stays - gets worse over time
-                score -= ant.consecutiveStays * 0.3f;
+            {
+                if (direction != Vector3Int.zero)
+                    score += 0.05f; // Workers get small exploration bonus
+                else
+                    score -= ant.consecutiveStays * 0.3f; // Penalty for staying
+            }
                 
             if (position == ant.previousPosition)
                 score -= 0.5f;
@@ -424,9 +459,10 @@ namespace Antymology.Agents
 
             score -= genome.crowdingWeight * nearbyAnts;
 
-            if (distanceToQueenSq < int.MaxValue && healthPercent > 0.7f)
+            // Workers strongly seek queens when they have health to donate
+            if (!(ant is QueenAnt) && distanceToQueenSq < int.MaxValue && healthPercent > 0.5f)
             {
-                score += genome.queenProximityWeight / Mathf.Max(1, distanceToQueenSq);
+                score += genome.queenProximityWeight * 15.0f / Mathf.Max(1, distanceToQueenSq);
             }
 
             return score;
