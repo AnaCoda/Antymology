@@ -87,12 +87,22 @@ namespace Antymology.Agents
         private bool TryConsumeMulch()
         {
             AbstractBlock blockBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
-            if (blockBelow is MulchBlock)
+            if (blockBelow is MulchBlock && !IsAnotherAntAtPosition(new Vector3Int(worldPosition.x, worldPosition.y - 1, worldPosition.z)))
             {
                 WorldManager.Instance.SetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z, new AirBlock());
                 MoveTo(new Vector3Int(worldPosition.x, worldPosition.y - 1, worldPosition.z));
                 Heal(ConfigurationManager.Instance.Mulch_Healing_Amount);
                 return true;
+            }
+            return false;
+        }
+
+        private bool IsAnotherAntAtPosition(Vector3Int position)
+        {
+            foreach (Ant ant in AntManager.Instance.Ants)
+            {
+                if (ant != this && ant.worldPosition == position)
+                    return true;
             }
             return false;
         }
