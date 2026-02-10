@@ -4,6 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 namespace Antymology.Terrain
 {
@@ -28,6 +29,11 @@ namespace Antymology.Terrain
         public Material blockMaterial;
 
         /// <summary>
+        /// The TextMeshPro UI element to display nest block count.
+        /// </summary>
+        public TextMeshProUGUI nestCountText;
+
+        /// <summary>
         /// The raw data of the underlying world structure.
         /// </summary>
         private AbstractBlock[,,] Blocks;
@@ -47,6 +53,11 @@ namespace Antymology.Terrain
         /// </summary>
         private SimplexNoise SimplexNoise;
 
+        /// <summary>
+        /// Counter for nest blocks in the world.
+        /// </summary>
+        private int nestBlockCount = 0;
+        
         #endregion
 
         #region Initialization
@@ -80,6 +91,9 @@ namespace Antymology.Terrain
         /// </summary>
         private void Start()
         {
+            GameObject evolutionManagerObj = new GameObject("EvolutionManager");
+            evolutionManagerObj.AddComponent<EvolutionManager>();
+            
             GenerateData();
             GenerateChunks();
 
@@ -89,25 +103,35 @@ namespace Antymology.Terrain
             GenerateAnts();
         }
 
+        private void Update()
+        {
+            if (nestCountText != null)
+            {
+                nestCountText.text = $"Nest Blocks: {nestBlockCount}";
+            }
+        }
+
         /// <summary>
         /// Spawns initial ants in the world at valid positions.
         /// </summary>
         private void GenerateAnts()
         {
-            GameObject antsContainer = new GameObject("Ants");
-            int antsToSpawn = ConfigurationManager.Instance.Initial_Ant_Count;
-
-            for (int i = 0; i < antsToSpawn; i++)
+            List<AntGenome> genomes = new List<AntGenome>();
+            for (int i = 0; i < ConfigurationManager.Instance.Initial_Ant_Count; i++)
             {
-                Vector3Int spawnPos = FindValidSpawnPosition();
-                
-                GameObject antObj = Instantiate(antPrefab, antsContainer.transform); 
-                Ant ant = antObj.GetComponent<Ant>();
+                AntGenome genome = new AntGenome();
+                genome.Randomize();
+                genomes.Add(genome);
+            }
+            RegenerateAnts(genomes);
+        }
 
-                if (ant != null)
-                {
-                    ant.MoveTo(spawnPos);
-                }
+        public void RegenerateAnts(List<AntGenome> genomes)
+        {
+            GameObject antsContainer = GameObject.Find("Ants");
+            if (antsContainer == null)
+            {
+                antsContainer = new GameObject("Ants");
             }
 
             // Spawn the queen
@@ -116,8 +140,32 @@ namespace Antymology.Terrain
             QueenAnt queenAnt = queenObj.GetComponent<QueenAnt>();
             if (queenAnt != null)
             {
+                if (genomes.Count > 0)
+                {
+                    queenAnt.genome = genomes[0];
+                }
+                else
+                {
+                    queenAnt.genome = new AntGenome();
+                    queenAnt.genome.Randomize();
+                }
                 queenAnt.MoveTo(queenSpawnPos);
                 AntManager.Instance.Queen = queenAnt;
+            }
+
+            // Spawn worker ants
+            for (int i = 1; i < genomes.Count; i++)
+            {
+                Vector3Int spawnPos = FindValidSpawnPosition();
+                
+                GameObject antObj = Instantiate(antPrefab, antsContainer.transform);
+                Ant ant = antObj.GetComponent<Ant>();
+
+                if (ant != null)
+                {
+                    ant.genome = genomes[i];
+                    ant.MoveTo(spawnPos);
+                }
             }
         }
 
@@ -217,6 +265,13 @@ namespace Antymology.Terrain
                 Debug.Log("Attempted to set a block which didn't exist");
                 return;
             }
+
+            AbstractBlock oldBlock = Blocks[WorldXCoordinate, WorldYCoordinate, WorldZCoordinate];
+            
+            if (oldBlock is NestBlock && !(toSet is NestBlock))
+                nestBlockCount--;
+            else if (!(oldBlock is NestBlock) && toSet is NestBlock)
+                nestBlockCount++;
 
             Blocks[WorldXCoordinate, WorldYCoordinate, WorldZCoordinate] = toSet;
 

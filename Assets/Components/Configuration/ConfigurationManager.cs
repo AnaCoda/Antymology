@@ -69,4 +69,19 @@ public class ConfigurationManager : Singleton<ConfigurationManager>
     /// Mulch block healing amount.
     /// </summary>
     public float Mulch_Healing_Amount = 3f;
+
+    /// <summary>
+    /// Vision range in blocks for ant micro decisions.
+    /// </summary>
+    public int Vision_Range = 3;
+
+    /// <summary>
+    /// Mutation rate for genome evolution.
+    /// </summary>
+    public float Mutation_Rate = 0.15f;
+
+    /// <summary>
+    /// Duration of each generation in seconds.
+    /// </summary>
+    public float Generation_Duration = 120f;
 }

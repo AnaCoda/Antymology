@@ -1,5 +1,6 @@
 using Antymology.Terrain;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace Antymology.Agents
 {
@@ -9,11 +10,27 @@ namespace Antymology.Agents
         public float maxHealth = 100f;
         
         public Vector3Int worldPosition;
-        private System.Random random = new System.Random();
+        public AntGenome genome;
+        public int mulchConsumed = 0;
+        
+        protected System.Random random = new System.Random();
+        public Vector3Int previousPosition;
+        public int consecutiveStays = 0;
 
         private void Start()
         {
             AntManager.Instance.RegisterAnt(this);
+            
+            if (genome == null)
+            {
+                genome = new AntGenome();
+                genome.Randomize();
+            }
+            
+            if (EvolutionManager.Instance != null)
+            {
+                EvolutionManager.Instance.RegisterAntGenome(genome);
+            }
         }
 
         private void OnDestroy()
@@ -43,32 +60,142 @@ namespace Antymology.Agents
             Destroy(gameObject);
         }
 
-        public void PerformTimestep()
+        public virtual void PerformTimestep()
         {
             if (!TryConsumeMulch())
             {
-                MoveRandomly();
+                TryShareHealth();
+                PerformMicroMovement();
             }
             TakeDamage(ConfigurationManager.Instance.Health_Reduction_Per_Timestep);
             MaybeTakeDamageFromAcid();
         }
 
-        private void MoveRandomly()
+        protected void PerformMicroMovement()
+        {
+            MicroInfo[] microOptions = ComputeMicroOptions();
+            MicroInfo best = microOptions[0];
+            
+            for (int i = 1; i < microOptions.Length; i++)
+            {
+                if (microOptions[i].IsBetter(best, this, random))
+                {
+                    best = microOptions[i];
+                }
+            }
+            
+            if (best.canMove && best.position != worldPosition)
+            {
+                MoveTo(best.position);
+                consecutiveStays = 0;
+            }
+            else
+            {
+                consecutiveStays++;
+            }
+        }
+
+        protected MicroInfo[] ComputeMicroOptions()
         {
             Vector3Int[] directions = 
             {
                 new Vector3Int(1, 0, 0),
                 new Vector3Int(-1, 0, 0),
                 new Vector3Int(0, 0, 1),
-                new Vector3Int(0, 0, -1)
+                new Vector3Int(0, 0, -1),
+                Vector3Int.zero
             };
 
-            Vector3Int direction = directions[random.Next(directions.Length)];
-            Vector3Int targetXZ = new Vector3Int(worldPosition.x + direction.x, 0, worldPosition.z + direction.z);
-
-            if (TryGetValidPosition(targetXZ.x, targetXZ.z, out Vector3Int validTarget))
+            MicroInfo[] options = new MicroInfo[5];
+            
+            for (int i = 0; i < directions.Length; i++)
             {
-                MoveTo(validTarget);
+                options[i] = new MicroInfo();
+                options[i].direction = directions[i];
+                
+                if (directions[i] == Vector3Int.zero)
+                {
+                    options[i].position = worldPosition;
+                    options[i].canMove = true;
+                }
+                else
+                {
+                    int targetX = worldPosition.x + directions[i].x;
+                    int targetZ = worldPosition.z + directions[i].z;
+                    
+                    if (TryGetValidPosition(targetX, targetZ, out Vector3Int validPos))
+                    {
+                        options[i].position = validPos;
+                        options[i].canMove = true;
+                    }
+                    else
+                    {
+                        options[i].position = worldPosition;
+                        options[i].canMove = false;
+                    }
+                }
+                
+                ScanEnvironment(options[i]);
+                
+                // Check if this position has food below that would strand us
+                AbstractBlock blockBelow = WorldManager.Instance.GetBlock(options[i].position.x, options[i].position.y - 1, options[i].position.z);
+                if (blockBelow is MulchBlock && WouldBeStrandedAtPosition(options[i].position))
+                {
+                    options[i].hasUneatableFood = true;
+                }
+            }
+            
+            return options;
+        }
+
+        private void ScanEnvironment(MicroInfo info)
+        {
+            int visionRange = ConfigurationManager.Instance.Vision_Range;
+            
+            for (int x = -visionRange; x <= visionRange; x++)
+            {
+                for (int z = -visionRange; z <= visionRange; z++)
+                {
+                    int checkX = info.position.x + x;
+                    int checkZ = info.position.z + z;
+                    
+                    for (int y = info.position.y - 2; y <= info.position.y + 2; y++)
+                    {
+                        AbstractBlock block = WorldManager.Instance.GetBlock(checkX, y, checkZ);
+                        int distSq = x * x + z * z;
+                        
+                        if (block is MulchBlock)
+                        {
+                            if (distSq < info.distanceToFoodSq)
+                                info.distanceToFoodSq = distSq;
+                        }
+                        else if (block is AcidicBlock)
+                        {
+                            if (distSq < info.distanceToAcidSq)
+                                info.distanceToAcidSq = distSq;
+                        }
+                    }
+                }
+            }
+            
+            info.nearbyAnts = 0;
+            foreach (Ant ant in AntManager.Instance.Ants)
+            {
+                if (ant == this) continue;
+                
+                int dx = ant.worldPosition.x - info.position.x;
+                int dz = ant.worldPosition.z - info.position.z;
+                int distSq = dx * dx + dz * dz;
+                
+                if (distSq <= visionRange * visionRange)
+                {
+                    info.nearbyAnts++;
+                    
+                    if (ant is QueenAnt && distSq < info.distanceToQueenSq)
+                    {
+                        info.distanceToQueenSq = distSq;
+                    }
+                }
             }
         }
 
@@ -84,17 +211,103 @@ namespace Antymology.Agents
             return true;
         }
 
-        private bool TryConsumeMulch()
+        protected bool TryConsumeMulch()
         {
             AbstractBlock blockBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
             if (blockBelow is MulchBlock && !IsAnotherAntAtPosition(new Vector3Int(worldPosition.x, worldPosition.y - 1, worldPosition.z)))
             {
-                WorldManager.Instance.SetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z, new AirBlock());
-                MoveTo(new Vector3Int(worldPosition.x, worldPosition.y - 1, worldPosition.z));
+                if (WouldBeStrandedAfterEating())
+                    return false;
+                
+                TryDig();
                 Heal(ConfigurationManager.Instance.Mulch_Healing_Amount);
+                mulchConsumed++;
                 return true;
             }
             return false;
+        }
+
+        private bool WouldBeStrandedAfterEating()
+        {
+            int newY = worldPosition.y - 1;
+            
+            int[] dx = { 1, -1, 0, 0 };
+            int[] dz = { 0, 0, 1, -1 };
+            
+            for (int i = 0; i < 4; i++)
+            {
+                int adjX = worldPosition.x + dx[i];
+                int adjZ = worldPosition.z + dz[i];
+                
+                int groundLevel = FindGroundLevel(adjX, adjZ);
+                if (groundLevel >= 0)
+                {
+                    int heightDiff = Mathf.Abs(groundLevel - newY);
+                    if (heightDiff == 0)
+                        return false;
+                }
+            }
+            
+            return true;
+        }
+
+        private bool WouldBeStrandedAtPosition(Vector3Int pos)
+        {
+            int newY = pos.y - 1;
+            
+            int[] dx = { 1, -1, 0, 0 };
+            int[] dz = { 0, 0, 1, -1 };
+            
+            for (int i = 0; i < 4; i++)
+            {
+                int adjX = pos.x + dx[i];
+                int adjZ = pos.z + dz[i];
+                
+                int groundLevel = FindGroundLevelFrom(adjX, adjZ, newY);
+                if (groundLevel >= 0)
+                {
+                    int heightDiff = Mathf.Abs(groundLevel - newY);
+                    if (heightDiff == 0)
+                        return false;
+                }
+            }
+            
+            return true;
+        }
+
+        protected void TryShareHealth()
+        {
+            if (health < maxHealth * 0.5f)
+                return;
+
+            foreach (Ant otherAnt in AntManager.Instance.Ants)
+            {
+                if (otherAnt == this || otherAnt.worldPosition != worldPosition)
+                    continue;
+
+                bool shouldShare = false;
+                float shareAmount = 0f;
+
+                if (otherAnt is QueenAnt && otherAnt.health < otherAnt.maxHealth * 0.6f)
+                {
+                    shouldShare = true;
+                    shareAmount = Mathf.Min(health - maxHealth * 0.3f, otherAnt.maxHealth - otherAnt.health);
+                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight);
+                }
+                else if (otherAnt.health < otherAnt.maxHealth * 0.3f && health > maxHealth * 0.7f)
+                {
+                    shouldShare = true;
+                    shareAmount = Mathf.Min(health - maxHealth * 0.5f, otherAnt.maxHealth * 0.2f);
+                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight * 0.5f);
+                }
+
+                if (shouldShare && shareAmount > 0)
+                {
+                    TakeDamage(shareAmount);
+                    otherAnt.Heal(shareAmount);
+                    return;
+                }
+            }
         }
 
         private bool IsAnotherAntAtPosition(Vector3Int position)
@@ -107,7 +320,7 @@ namespace Antymology.Agents
             return false;
         }
 
-        private bool MaybeTakeDamageFromAcid()
+        protected bool MaybeTakeDamageFromAcid()
         {
             AbstractBlock blockBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
             if (blockBelow is AcidicBlock)
@@ -121,8 +334,12 @@ namespace Antymology.Agents
         private int FindGroundLevel(int x, int z)
         {
             int currentGroundY = worldPosition.y - 1;
-            
-            for (int y = currentGroundY + 2; y >= currentGroundY - 2; y--)
+            return FindGroundLevelFrom(x, z, currentGroundY);
+        }
+
+        private int FindGroundLevelFrom(int x, int z, int referenceY)
+        {
+            for (int y = referenceY + 5; y >= referenceY - 2; y--)
             {
                 AbstractBlock block = WorldManager.Instance.GetBlock(x, y, z);
                 AbstractBlock above = WorldManager.Instance.GetBlock(x, y + 1, z);
@@ -144,8 +361,96 @@ namespace Antymology.Agents
                 transform.rotation = Quaternion.LookRotation(direction);
             }
             
+            previousPosition = worldPosition;
             worldPosition = target;
             transform.position = new Vector3(target.x, target.y - 0.5f, target.z);
+        }
+
+        private void TryDig()
+        {
+            AbstractBlock blockBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
+            if (blockBelow is not ContainerBlock)
+            {
+                WorldManager.Instance.SetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z, new AirBlock());
+                MoveTo(new Vector3Int(worldPosition.x, worldPosition.y - 1, worldPosition.z));
+            }
+        }
+    }
+
+    public class MicroInfo
+    {
+        public Vector3Int direction;
+        public Vector3Int position;
+        public bool canMove;
+        public int distanceToFoodSq = int.MaxValue;
+        public int distanceToAcidSq = int.MaxValue;
+        public int distanceToQueenSq = int.MaxValue;
+        public int nearbyAnts = 0;
+        public bool hasUneatableFood = false;
+
+        public float ComputeScore(Ant ant)
+        {
+            if (!canMove) return float.MinValue;
+
+            float healthPercent = ant.health / ant.maxHealth;
+            AntGenome genome = ant.genome;
+            float score = 0;
+            
+            // Small exploration bonus for moving (not staying)
+            if (direction != Vector3Int.zero)
+                score += 0.05f;
+            else
+                // Penalty for consecutive stays - gets worse over time
+                score -= ant.consecutiveStays * 0.3f;
+                
+            if (position == ant.previousPosition)
+                score -= 0.5f;
+            
+            // Heavy penalty for positions with food we can't eat
+            if (hasUneatableFood)
+                score -= 2.0f;
+
+            float foodUrgency = healthPercent < 0.5f ? genome.healthUrgencyMultiplier : 1.0f;
+            
+            if (distanceToFoodSq < int.MaxValue)
+            {
+                score += genome.foodSeekingWeight * foodUrgency / Mathf.Max(1, distanceToFoodSq);
+            }
+
+            if (distanceToAcidSq < int.MaxValue)
+            {
+                score -= genome.acidAvoidanceWeight / Mathf.Max(1, distanceToAcidSq);
+            }
+
+            score -= genome.crowdingWeight * nearbyAnts;
+
+            if (distanceToQueenSq < int.MaxValue && healthPercent > 0.7f)
+            {
+                score += genome.queenProximityWeight / Mathf.Max(1, distanceToQueenSq);
+            }
+
+            return score;
+        }
+
+        public bool IsBetter(MicroInfo other, Ant ant, System.Random random)
+        {
+            if (!canMove) return false;
+            if (canMove && !other.canMove) return true;
+
+            if (distanceToAcidSq < 4 && other.distanceToAcidSq >= 4)
+                return false;
+            if (distanceToAcidSq >= 4 && other.distanceToAcidSq < 4)
+                return true;
+
+            float myScore = ComputeScore(ant);
+            float otherScore = other.ComputeScore(ant);
+
+            if (Mathf.Abs(myScore - otherScore) < 0.01f)
+            {
+                return random.NextDouble() > 0.5;
+            }
+
+            return myScore > otherScore;
         }
     }
 }
