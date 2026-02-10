@@ -109,6 +109,16 @@ namespace Antymology.Terrain
                     ant.MoveTo(spawnPos);
                 }
             }
+
+            // Spawn the queen
+            Vector3Int queenSpawnPos = FindValidSpawnPosition();
+            GameObject queenObj = Instantiate(queenAntPrefab, antsContainer.transform);
+            QueenAnt queenAnt = queenObj.GetComponent<QueenAnt>();
+            if (queenAnt != null)
+            {
+                queenAnt.MoveTo(queenSpawnPos);
+                AntManager.Instance.Queen = queenAnt;
+            }
         }
 
         /// <summary>

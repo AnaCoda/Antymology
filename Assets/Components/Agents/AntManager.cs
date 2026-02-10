@@ -10,6 +10,7 @@ namespace Antymology.Agents
         private float timeSinceLastStep = 0f;
 
         public IReadOnlyList<Ant> Ants => ants.AsReadOnly();
+        public QueenAnt Queen { get; set; }
 
         private void Update()
         {

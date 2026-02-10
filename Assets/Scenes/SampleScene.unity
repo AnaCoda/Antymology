@@ -482,6 +482,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   antPrefab: {fileID: 7141960012651393014, guid: fbbf556c23c2123428ffe3125e801403,
     type: 3}
+  queenAntPrefab: {fileID: 0}
   blockMaterial: {fileID: 2100000, guid: 4db9d8fce1a69b74f81daf1375c9ed88, type: 2}
 --- !u!4 &964896558
 Transform:
@@ -519,7 +520,7 @@ MonoBehaviour:
   Acidic_Region_Radius: 5
   Number_Of_Conatiner_Spheres: 5
   Conatiner_Sphere_Radius: 10
-  Initial_Ant_Count: 500
+  Initial_Ant_Count: 50
   Timestep_Interval: 0.2
   Health_Reduction_Per_Timestep: 1
   Mulch_Healing_Amount: 3
