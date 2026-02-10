@@ -96,13 +96,12 @@ namespace Antymology.Terrain
             {
                 Vector3Int spawnPos = FindValidSpawnPosition();
                 
-                GameObject antObj = Instantiate(antPrefab, antsContainer.transform);
-                antObj.transform.position = new Vector3(spawnPos.x, spawnPos.y - 0.5f, spawnPos.z);
-                
+                GameObject antObj = Instantiate(antPrefab, antsContainer.transform); 
                 Ant ant = antObj.GetComponent<Ant>();
+
                 if (ant != null)
                 {
-                    ant.worldPosition = spawnPos;
+                    ant.MoveTo(spawnPos);
                 }
             }
         }

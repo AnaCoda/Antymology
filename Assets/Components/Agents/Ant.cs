@@ -14,7 +14,6 @@ namespace Antymology.Agents
         private void Start()
         {
             AntManager.Instance.RegisterAnt(this);
-            Debug.Log($"Ant registered at position {worldPosition}");
         }
 
         private void OnDestroy()
@@ -51,7 +50,7 @@ namespace Antymology.Agents
 
         private void MoveRandomly()
         {
-            Vector3Int[] directions = new Vector3Int[]
+            Vector3Int[] directions = 
             {
                 new Vector3Int(1, 0, 0),
                 new Vector3Int(-1, 0, 0),
@@ -60,32 +59,47 @@ namespace Antymology.Agents
             };
 
             Vector3Int direction = directions[random.Next(directions.Length)];
-            Vector3Int targetPos = worldPosition + direction;
+            Vector3Int targetXZ = new Vector3Int(worldPosition.x + direction.x, 0, worldPosition.z + direction.z);
 
-            if (IsValidMove(targetPos))
+            if (TryGetValidPosition(targetXZ.x, targetXZ.z, out Vector3Int validTarget))
             {
-                worldPosition = targetPos;
-                transform.position = new Vector3(targetPos.x, targetPos.y, targetPos.z);
+                MoveTo(validTarget);
             }
         }
 
-        private bool IsValidMove(Vector3Int target)
+        private bool TryGetValidPosition(int targetX, int targetZ, out Vector3Int result)
         {
-            AbstractBlock targetBlock = WorldManager.Instance.GetBlock(target.x, target.y, target.z);
-            AbstractBlock belowTarget = WorldManager.Instance.GetBlock(target.x, target.y - 1, target.z);
-            AbstractBlock currentBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
-
-            if (!(targetBlock is AirBlock))
+            result = Vector3Int.zero;
+            
+            int groundY = FindGroundLevel(targetX, targetZ);
+            if (groundY < 0)
                 return false;
 
-            if (belowTarget is AirBlock)
-                return false;
-
-            int heightDifference = Mathf.Abs(target.y - worldPosition.y);
-            if (heightDifference > 2)
-                return false;
-
+            result = new Vector3Int(targetX, groundY + 1, targetZ);
             return true;
+        }
+
+        private int FindGroundLevel(int x, int z)
+        {
+            int currentGroundY = worldPosition.y - 1;
+            
+            for (int y = currentGroundY + 2; y >= currentGroundY - 2; y--)
+            {
+                AbstractBlock block = WorldManager.Instance.GetBlock(x, y, z);
+                AbstractBlock above = WorldManager.Instance.GetBlock(x, y + 1, z);
+                
+                if (!(block is AirBlock) && above is AirBlock)
+                {
+                    return y;
+                }
+            }
+            return -1;
+        }
+
+        public void MoveTo(Vector3Int target)
+        {
+            worldPosition = target;
+            transform.position = new Vector3(target.x, target.y - 0.5f, target.z);
         }
     }
 }
