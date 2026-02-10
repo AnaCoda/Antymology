@@ -50,6 +50,7 @@ namespace Antymology.Agents
                 MoveRandomly();
             }
             TakeDamage(ConfigurationManager.Instance.Health_Reduction_Per_Timestep);
+            MaybeTakeDamageFromAcid();
         }
 
         private void MoveRandomly()
@@ -91,6 +92,17 @@ namespace Antymology.Agents
                 WorldManager.Instance.SetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z, new AirBlock());
                 MoveTo(new Vector3Int(worldPosition.x, worldPosition.y - 1, worldPosition.z));
                 Heal(ConfigurationManager.Instance.Mulch_Healing_Amount);
+                return true;
+            }
+            return false;
+        }
+
+        private bool MaybeTakeDamageFromAcid()
+        {
+            AbstractBlock blockBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
+            if (blockBelow is AcidBlock)
+            {
+                TakeDamage(ConfigurationManager.Instance.Health_Reduction_Per_Timestep);
                 return true;
             }
             return false;

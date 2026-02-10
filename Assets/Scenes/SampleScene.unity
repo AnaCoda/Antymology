@@ -520,7 +520,9 @@ MonoBehaviour:
   Number_Of_Conatiner_Spheres: 5
   Conatiner_Sphere_Radius: 10
   Initial_Ant_Count: 500
-  Timestep_Interval: 0.5
+  Timestep_Interval: 0.2
+  Health_Reduction_Per_Timestep: 1
+  Mulch_Healing_Amount: 3
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
