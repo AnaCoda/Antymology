@@ -54,4 +54,9 @@ public class ConfigurationManager : Singleton<ConfigurationManager>
     /// The number of ants to spawn at the start of the game.
     /// </summary>
     public int Initial_Ant_Count = 500;
+
+    /// <summary>
+    /// Time in seconds between each timestep.
+    /// </summary>
+    public float Timestep_Interval = 0.5f;
 }
