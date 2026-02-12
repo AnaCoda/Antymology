@@ -20,18 +20,21 @@ namespace Antymology.Agents
             stepsSinceLastBuild++;
             
             TryShareHealth();
-            
-            // Must wait at least 3 steps between nest builds
-            if (ShouldBuildNest() && stepsSinceLastBuild >= 3)
-            {
-                BuildNest();
-            }
-            else
-            {
-                PerformQueenMicroMovement();
-            }
-            
-            TakeDamage(ConfigurationManager.Instance.Health_Reduction_Per_Timestep);
+
+			//// Must wait at least 3 steps between nest builds
+			//if (ShouldBuildNest() && stepsSinceLastBuild >= 3)
+			//{
+			//    BuildNest();
+			//}
+			//else
+			//{
+			//    PerformQueenMicroMovement();
+			//}
+
+			PerformQueenMicroMovement();
+			if (health >= 40) BuildNest();
+
+			TakeDamage(ConfigurationManager.Instance.Health_Reduction_Per_Timestep);
             MaybeTakeDamageFromAcid();
         }
 
@@ -49,20 +52,26 @@ namespace Antymology.Agents
             }
             
             AbstractBlock blockBelow = WorldManager.Instance.GetBlock(worldPosition.x, worldPosition.y - 1, worldPosition.z);
-            if (blockBelow is NestBlock && best.position == worldPosition)
-            {
-                Debug.Log($"[Queen] WARNING: Choosing to stay on nest! Health: {health:F1}, stepsSinceLastBuild: {stepsSinceLastBuild}");
-            }
-            
-            if (best.canMove && best.position != worldPosition)
-            {
-                MoveTo(best.position);
-                consecutiveStays = 0;
-            }
-            else
-            {
-                consecutiveStays++;
-            }
+            if (blockBelow is NestBlock) 
+			{
+				if (best.position == worldPosition) 
+				{
+					Debug.Log($"[Queen] WARNING: Choosing to stay on nest! Health: {health:F1}, stepsSinceLastBuild: {stepsSinceLastBuild}");
+				}
+            } else if (!(blockBelow is NestBlock) && !(blockBelow is ContainerBlock) && !(blockBelow is AirBlock))
+			{
+				return;
+			}
+
+			if (best.canMove && best.position != worldPosition)
+			{
+				MoveTo(best.position);
+				consecutiveStays = 0;
+			}
+			else
+			{
+				consecutiveStays++;
+			}
         }
 
         protected override void Die()

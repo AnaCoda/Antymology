@@ -67,11 +67,11 @@ namespace Antymology.Agents
         {
             survivalTime += 1f;
             stepsSinceHealthTransfer++;
-            
-            if (!TryConsumeMulch())
+			PerformMicroMovement();
+			if (!TryConsumeMulch())
             {
                 TryShareHealth();
-                PerformMicroMovement();
+                //PerformMicroMovement();
             }
             TakeDamage(ConfigurationManager.Instance.Health_Reduction_Per_Timestep);
             MaybeTakeDamageFromAcid();
@@ -306,20 +306,22 @@ namespace Antymology.Agents
                 if (!(this is QueenAnt) && otherAnt is QueenAnt && otherAnt.health < otherAnt.maxHealth * 0.95f)
                 {
                     shouldShare = true;
-                    shareAmount = Mathf.Min(health - maxHealth * 0.4f, otherAnt.maxHealth - otherAnt.health);
-                    shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight * 3.0f);
-                    
-                    if (shareAmount < 5f)
-                        shouldShare = false;
-                }
-                else if (this is QueenAnt && !(otherAnt is QueenAnt) && otherAnt.health < otherAnt.maxHealth * 0.15f)
-                {
-                    shouldShare = true;
-                    shareAmount = Mathf.Min(health - maxHealth * 0.3f, 10f); // Small emergency donation
-                    shareAmount = Mathf.Max(0, shareAmount);
-                }
+					shareAmount = (otherAnt.maxHealth - otherAnt.health) / 2;
+					//shareAmount = Mathf.Max(0, shareAmount * genome.altruismWeight);
+					//shareAmount = Mathf.Min(shareAmount, maxHealth);
+					shareAmount = shareAmount * genome.altruismWeight;
 
-                if (shouldShare && shareAmount > 0)
+					//if (shareAmount < 5f)
+     //                   shouldShare = false;
+                }
+                //else if (this is QueenAnt && !(otherAnt is QueenAnt) && otherAnt.health < otherAnt.maxHealth * 0.15f)
+                //{
+                //    shouldShare = true;
+                //    shareAmount = Mathf.Min(health - maxHealth * 0.3f, 10f); // Small emergency donation
+                //    shareAmount = Mathf.Max(0, shareAmount);
+                //}
+
+                if (shouldShare && shareAmount > 0 && shareAmount < maxHealth)
                 {
                     TakeDamage(shareAmount);
                     otherAnt.Heal(shareAmount);
@@ -431,13 +433,10 @@ namespace Antymology.Agents
             // Queens prefer to stay put but not too much, workers prefer to move
             if (ant is QueenAnt)
             {
-                if (direction == Vector3Int.zero)
-                {
-                    if (onNest)
-                        score -= 5.0f; // Strong penalty for staying on nest
-                    else
-                        score += 0.2f; // Queens like staying but can still move
-                }
+                if (onNest)
+                    score -= 55.0f; // Strong penalty for staying on nest
+                else
+                    score += 0.2f; // Queens like staying but can still move
             }
             else
             {
@@ -470,7 +469,7 @@ namespace Antymology.Agents
 
             if (!(ant is QueenAnt) && distanceToQueenSq < int.MaxValue && healthPercent > 0.6f)
             {
-                score += genome.queenProximityWeight * 50.0f / Mathf.Max(1, distanceToQueenSq);
+                score += genome.queenProximityWeight * 100.0f / Mathf.Max(1, distanceToQueenSq);
             }
 
             return score;
@@ -478,6 +477,7 @@ namespace Antymology.Agents
 
         public bool IsBetter(MicroInfo other, Ant ant, System.Random random)
         {
+			//if (other.position == ant.worldPosition) return false;
             if (!canMove) return false;
             if (canMove && !other.canMove) return true;
 

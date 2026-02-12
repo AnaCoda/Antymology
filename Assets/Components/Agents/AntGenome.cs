@@ -9,7 +9,7 @@ namespace Antymology.Agents
         public float crowdingWeight = 0.3f;
         public float healthUrgencyMultiplier = 2.0f;
         public float queenProximityWeight = 0.5f;
-        public float altruismWeight = 0.5f;
+        public float altruismWeight = 1.0f;
 
         public AntGenome()
         {
