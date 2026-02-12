@@ -6,6 +6,8 @@ An evolutionary simulation where artificial ant colonies compete to build the la
 
 This project simulates a colony of ants in a 3D terrain environment, where ants must learn to forage, survive, and transfer health to their queen who constructs nests (the ultimate metric we are trying to increase). Ants evolve strategies through an evolutionary algorithm that rewards successful nest construction. The system demonstrates how complex group behaviors can emerge from simple individual rules and evolutionary pressure.
 
+![Ant Generation Example](Images/GenerationalRun.gif)
+
 ## How It Works
 
 Each ant carries a genome that encodes its behavioral biases. At every timestep, an ant evaluates its available moves and scores them based on its genetic weighting of various environmental factors. The ant can move in four directions or stay in place, but cannot move to a block more than 2 units higher or lower in elevation.
